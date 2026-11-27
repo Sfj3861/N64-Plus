@@ -1,15 +1,29 @@
-# SNES runtime integration scaffold
+# SNES Libretro frontend
 
-## Implemented in this iteration
+## Implemented frontend
 
-- The selected SAF document URI, title and extension are passed to EmulatorActivity.
-- The activity copies the selected content into an app-private cache directory before runtime setup.
-- Empty files, unreadable document URIs and cache-directory creation failures are reported.
-- The optional core loader checks the Libretro frontend entry points, closes stale handles before re-probing, and releases incompatible libraries.
-- The activity closes the loaded library when it is destroyed.
+- Loads a compatible Android Libretro core from app-private storage.
+- Checks the Libretro API version and required entry points.
+- Initializes the core and loads the selected content by path.
+- Executes retro_run on a dedicated, frame-paced thread.
+- Renders XRGB8888 video frames to an Android Surface through ANativeWindow.
+- Streams stereo signed 16-bit audio into Android AudioTrack.
+- Maps on-screen SNES controls to the Libretro joypad device.
+- Stops the run loop before unloading the game and core.
+- Handles activity and Surface lifecycle transitions.
 
-## Current limitations
+## Required external core
 
-This is a runtime staging and compatibility-probe milestone, **not playable emulation**. The native layer does not yet call retro_set_environment, initialize the core, load staged content with retro_load_game, or execute retro_run. Video rendering, audio output, input mapping, save data and lifecycle pause/resume integration remain pending.
+The app does not currently bundle a SNES core. Put a compatible ARM64 Android Libretro SNES core at:
 
-The expected core path is app-private files/cores/libretro_snes.so. The app does not bundle ROMs or third-party core binaries. Users must provide content they are legally entitled to use and a compatible core build.
+`/data/data/com.sfj.n64plus/files/cores/libretro_snes.so`
+
+The core must report Libretro API version 1 and accept XRGB8888 output. The selected ROM must be supported by that core. The app does not provide game ROMs.
+
+## Known limitations
+
+- No save-state UI or SRAM persistence yet.
+- No Bluetooth/controller mapping yet.
+- No aspect-ratio or shader settings yet.
+- The current video frontend expects XRGB8888 output.
+- Loading errors are shown in the player status text.
