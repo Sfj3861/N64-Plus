@@ -2,7 +2,7 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 android {
     namespace = "com.sfj.n64plus"
     compileSdk = 35
-    defaultConfig {
+    compileOptions {\n        sourceCompatibility = JavaVersion.VERSION_17\n        targetCompatibility = JavaVersion.VERSION_17\n    }\n    kotlinOptions { jvmTarget = "17" }\n    defaultConfig {
         applicationId = "com.sfj.n64plus"
         minSdk = 26
         targetSdk = 35
