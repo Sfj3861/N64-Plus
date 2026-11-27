@@ -1,0 +1,79 @@
+add_library(main SHARED
+  AchievementAdapter.cpp
+  ActivityTracker.cpp
+  Cheats/ARCheat.cpp
+  Cheats/Cheats.h
+  Cheats/GeckoCheat.cpp
+  Cheats/GraphicsMod.cpp
+  Cheats/GraphicsModGroup.cpp
+  Cheats/PatchCheat.cpp
+  Config/ConfigChangedCallback.cpp
+  Config/NativeConfig.cpp
+  Config/PostProcessing.cpp
+  GameList/GameFile.cpp
+  GameList/GameFile.h
+  GameList/GameFileCache.cpp
+  GameList/TitleDatabase.cpp
+  GameList/TitleDatabase.h
+  GpuDriver.cpp
+  HotkeyScheduler.cpp
+  HotkeyScheduler.h
+  InfinityConfig.cpp
+  Input/Control.cpp
+  Input/Control.h
+  Input/ControlGroup.cpp
+  Input/ControlGroup.h
+  Input/ControlReference.cpp
+  Input/ControlReference.h
+  Input/CoreDevice.cpp
+  Input/CoreDevice.h
+  Input/EmulatedController.cpp
+  Input/EmulatedController.h
+  Input/InputDetector.cpp
+  Input/InputOverrider.cpp
+  Input/MappingCommon.cpp
+  Input/NumericSetting.cpp
+  Input/NumericSetting.h
+  NetPlay/Netplay.cpp
+  NetPlay/NetPlayUICallbacks.cpp
+  NetPlay/NetPlayUICallbacks.h
+  MainAndroid.cpp
+  RiivolutionPatches.cpp
+  SkylanderConfig.cpp
+  WiiUtils.cpp
+)
+
+target_link_libraries(main
+PRIVATE
+  androidcommon
+  common
+  core
+  inputcommon
+  uicommon
+)
+
+target_link_libraries(main
+PRIVATE
+  android
+  log
+  "-Wl,--no-warn-mismatch"
+  "-Wl,--whole-archive"
+  "-Wl,--no-whole-archive"
+)
+
+target_include_directories(main
+PRIVATE
+    ${PROJECT_SOURCE_DIR}/Externals/libadrenotools/include
+    ${PROJECT_SOURCE_DIR}/Externals/VulkanMemoryAllocator/include
+)
+
+file(MAKE_DIRECTORY ${PROJECT_SOURCE_DIR}/Source/Android/app/src/main/assets/)
+file(REMOVE_RECURSE ${PROJECT_SOURCE_DIR}/Source/Android/app/src/main/assets/Sys/)
+file(COPY ${PROJECT_SOURCE_DIR}/Data/Sys DESTINATION ${PROJECT_SOURCE_DIR}/Source/Android/app/src/main/assets/)
+
+# Delete folders that aren't used by the Android version of Dolphin
+file(REMOVE_RECURSE ${PROJECT_SOURCE_DIR}/Source/Android/app/src/main/assets/Sys/Themes/)
+
+set(CPACK_PACKAGE_EXECUTABLES ${CPACK_PACKAGE_EXECUTABLES} main)
+
+add_subdirectory(AndroidCommon)
