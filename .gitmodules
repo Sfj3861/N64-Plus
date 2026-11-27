@@ -1,0 +1,11 @@
+[submodule "third_party/dolphin"]
+	path = third_party/dolphin
+	url = https://github.com/dolphin-emu/dolphin.git
+
+[submodule "third_party/mupen64plus-next"]
+	path = third_party/mupen64plus-next
+	url = https://github.com/libretro/mupen64plus-libretro-nx.git
+
+[submodule "third_party/bsnes-libretro"]
+	path = third_party/bsnes-libretro
+	url = https://github.com/libretro/bsnes-libretro.git
