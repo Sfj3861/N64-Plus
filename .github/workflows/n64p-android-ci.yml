@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build-debug-apk:
-    name: Build debug APK
+    name: Build ARM64 debug APK
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,6 +30,18 @@ jobs:
 
       - name: Install Android native build tools
         run: sdkmanager "cmake;3.22.1" "ndk;27.0.12077973"
+
+      - name: Fetch official Snes9x Libretro core for Android ARM64
+        run: |
+          mkdir -p app/src/main/jniLibs/arm64-v8a /tmp/snes9x-core
+          curl --fail --location --retry 3 \
+            https://buildbot.libretro.com/nightly/android/latest/arm64-v8a/snes9x_libretro_android.so.zip \
+            --output /tmp/snes9x-core.zip
+          unzip -o -j /tmp/snes9x-core.zip -d /tmp/snes9x-core
+          CORE="$(find /tmp/snes9x-core -maxdepth 1 -type f -name '*.so' -print -quit)"
+          test -n "$CORE"
+          install -m 0644 "$CORE" app/src/main/jniLibs/arm64-v8a/libretro_snes.so
+          test -s app/src/main/jniLibs/arm64-v8a/libretro_snes.so
 
       - name: Build N64_P debug APK
         run: |
