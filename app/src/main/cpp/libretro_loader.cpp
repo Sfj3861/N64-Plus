@@ -1,18 +1,22 @@
 #include <jni.h>
 #include <dlfcn.h>
+#include <mutex>
 #include <string>
 
 static void* coreHandle = nullptr;
+static std::mutex coreMutex;
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_sfj_n64plus_EmulatorActivity_nativeProbeCore(JNIEnv* env, jobject, jstring path) {
     if (path == nullptr) return env->NewStringUTF("Core path was not provided.");
+    const char* p = env->GetStringUTFChars(path, nullptr);
+    if (p == nullptr) return env->NewStringUTF("Could not read core path.");
+
+    std::lock_guard<std::mutex> guard(coreMutex);
     if (coreHandle != nullptr) {
         dlclose(coreHandle);
         coreHandle = nullptr;
     }
-    const char* p = env->GetStringUTFChars(path, nullptr);
-    if (p == nullptr) return env->NewStringUTF("Could not read core path.");
 
     dlerror();
     void* handle = dlopen(p, RTLD_NOW | RTLD_LOCAL);
@@ -44,12 +48,14 @@ Java_com_sfj_n64plus_EmulatorActivity_nativeProbeCore(JNIEnv* env, jobject, jstr
             result = "The library is not a complete Libretro core.\n" + result;
         }
     }
+
     env->ReleaseStringUTFChars(path, p);
     return env->NewStringUTF(result.c_str());
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_sfj_n64plus_EmulatorActivity_nativeCloseCore(JNIEnv*, jobject) {
+    std::lock_guard<std::mutex> guard(coreMutex);
     if (coreHandle != nullptr) {
         dlclose(coreHandle);
         coreHandle = nullptr;
