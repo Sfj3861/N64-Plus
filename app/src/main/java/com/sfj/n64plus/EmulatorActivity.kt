@@ -181,8 +181,8 @@ class EmulatorActivity : Activity(), SurfaceHolder.Callback {
         setStatus("Loading SNES core…")
         io.execute {
             try {
-                val core = File(filesDir, "cores/libretro_snes.so")
-                if (!core.isFile) throw IOException("SNES core missing. Expected: ${core.absolutePath}")
+                val core = File(applicationInfo.nativeLibraryDir, "libretro_snes.so")
+                if (!core.isFile) throw IOException("SNES core missing. Expected bundled core: ${core.absolutePath}")
                 val sampleRate = nativePrepare(core.absolutePath, game.absolutePath, surface)
                 if (sampleRate <= 0.0) throw IOException("The core could not initialize or rejected this ROM. Check that it is an Android ARM64 Libretro SNES core.")
                 val rate = sampleRate.toInt().coerceIn(8000, 96000)
