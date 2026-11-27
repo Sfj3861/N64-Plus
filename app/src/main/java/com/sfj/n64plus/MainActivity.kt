@@ -78,8 +78,17 @@ class MainActivity : Activity() {
             addView(button("Select game", Color.rgb(49, 64, 91)) { selectedGame = game; status.text = "Selected: ${game.title}" })
         }) }
     }
-    private fun launchSelected() { val game = selectedGame ?: run { Toast.makeText(this, "Select a game first.", Toast.LENGTH_SHORT).show(); return }
-        status.text = "Launch backend is not yet complete. ${game.title} is selected."; Toast.makeText(this, "SNES playback engine integration is still in development.", Toast.LENGTH_LONG).show()
+    private fun launchSelected() {
+        val game = selectedGame ?: run { Toast.makeText(this, "Select a game first.", Toast.LENGTH_SHORT).show(); return }
+        if (selectedConsole != "Super Nintendo") {
+            Toast.makeText(this, "Only the SNES runtime bridge is available in this build.", Toast.LENGTH_LONG).show()
+            return
+        }
+        startActivity(Intent(this, EmulatorActivity::class.java).apply {
+            putExtra(EmulatorActivity.EXTRA_GAME_URI, game.uri.toString())
+            putExtra(EmulatorActivity.EXTRA_GAME_TITLE, game.title)
+            putExtra(EmulatorActivity.EXTRA_GAME_EXTENSION, game.extension)
+        })
     }
     private fun panelCard() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(12), dp(14), dp(12)); setBackgroundColor(panel); val lp = LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, dp(5), 0, dp(5)); layoutParams = lp }
     private fun label(text: String, size: Int, color: Int, bold: Boolean = false) = TextView(this).apply { this.text = text; textSize = size.toFloat(); setTextColor(color); if (bold) typeface = Typeface.DEFAULT_BOLD; setPadding(dp(3), dp(5), dp(3), dp(5)) }
