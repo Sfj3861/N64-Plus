@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(n64plus_runtime)
+add_library(n64plus_runtime SHARED libretro_loader.cpp)
+find_library(log-lib log)
+target_link_libraries(n64plus_runtime ${log-lib} dl)
