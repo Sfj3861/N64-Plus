@@ -1,0 +1,2 @@
+## Per-console game folders
+The UI now assigns and persistently stores a separate Android document-tree folder for each console (Nintendo 64, SNES, Wii, GameCube). Changing consoles shows that console's stored folder. Folder selection uses ACTION_OPEN_DOCUMENT_TREE and persistable permissions. Folder scanning, filtering and gameplay remain future work.
