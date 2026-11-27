@@ -5,11 +5,9 @@
 #include <dlfcn.h>
 #include <atomic>
 #include <cstdint>
-#include <cstring>
 #include <mutex>
 #include <string>
 #include <thread>
-#include <vector>
 #include <chrono>
 #include <algorithm>
 
@@ -63,9 +61,10 @@ static std::thread emulationThread;
 static std::atomic<bool> running{false};
 static std::atomic<uint16_t> joypadMask{0};
 static std::mutex coreMutex;
-static unsigned videoWidth = 256, videoHeight = 224;
 static double frameRate = 60.0, audioRate = 32000.0;
+static bool coreInitialized = false;
 static bool gameLoaded = false;
+static unsigned configuredWidth = 0, configuredHeight = 0;
 
 static bool environmentCallback(unsigned command, void* data) {
     switch (command) {
@@ -79,12 +78,7 @@ static bool environmentCallback(unsigned command, void* data) {
         case RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME:
             return true;
         case RETRO_ENVIRONMENT_SET_GEOMETRY:
-            if (data) {
-                auto* g = static_cast<retro_game_geometry*>(data);
-                videoWidth = std::max(1u, g->base_width);
-                videoHeight = std::max(1u, g->base_height);
-            }
-            return true;
+            return data != nullptr;
         default:
             return false;
     }
@@ -92,8 +86,12 @@ static bool environmentCallback(unsigned command, void* data) {
 
 static void videoCallback(const void* data, unsigned width, unsigned height, size_t pitch) {
     if (!data || !windowHandle || width == 0 || height == 0) return;
-    ANativeWindow_setBuffersGeometry(windowHandle, static_cast<int32_t>(width),
-                                     static_cast<int32_t>(height), WINDOW_FORMAT_RGBA_8888);
+    if (width != configuredWidth || height != configuredHeight) {
+        ANativeWindow_setBuffersGeometry(windowHandle, static_cast<int32_t>(width),
+                                         static_cast<int32_t>(height), WINDOW_FORMAT_RGBA_8888);
+        configuredWidth = width;
+        configuredHeight = height;
+    }
     ANativeWindow_Buffer buffer;
     if (ANativeWindow_lock(windowHandle, &buffer, nullptr) != 0) return;
     const auto* src = static_cast<const uint8_t*>(data);
@@ -118,7 +116,7 @@ static size_t audioBatchCallback(const int16_t* samples, size_t frames) {
     if (!samples || frames == 0 || !javaVm || !javaActivity || !audioMethod) return frames;
     JNIEnv* env = nullptr;
     bool attached = false;
-    jint state = javaVm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    const jint state = javaVm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
     if (state == JNI_EDETACHED) {
         if (javaVm->AttachCurrentThread(&env, nullptr) != JNI_OK) return frames;
         attached = true;
@@ -140,7 +138,6 @@ static void audioSampleCallback(int16_t left, int16_t right) {
     const int16_t pair[2] = {left, right};
     audioBatchCallback(pair, 1);
 }
-
 static void inputPollCallback() {}
 static int16_t inputStateCallback(unsigned port, unsigned device, unsigned index, unsigned id) {
     if (port != 0 || device != RETRO_DEVICE_JOYPAD || index != 0 || id > 15) return 0;
@@ -158,7 +155,7 @@ static void releaseCore() {
     if (emulationThread.joinable() && emulationThread.get_id() != std::this_thread::get_id())
         emulationThread.join();
     if (gameLoaded && core.unload_game) { core.unload_game(); gameLoaded = false; }
-    if (core.deinit) core.deinit();
+    if (coreInitialized && core.deinit) { core.deinit(); coreInitialized = false; }
     core = CoreApi{};
     if (coreHandle) { dlclose(coreHandle); coreHandle = nullptr; }
     if (windowHandle) { ANativeWindow_release(windowHandle); windowHandle = nullptr; }
@@ -169,6 +166,7 @@ static void releaseCore() {
         javaActivity = nullptr;
     }
     audioMethod = nullptr;
+    configuredWidth = configuredHeight = 0;
     joypadMask.store(0);
 }
 
@@ -200,10 +198,7 @@ Java_com_sfj_n64plus_EmulatorActivity_nativePrepare(JNIEnv* env, jobject thiz,
     }
     coreHandle = dlopen(cp, RTLD_NOW | RTLD_LOCAL);
     env->ReleaseStringUTFChars(corePath, cp);
-    if (!coreHandle) {
-        env->ReleaseStringUTFChars(gamePath, gp);
-        return -1.0;
-    }
+    if (!coreHandle) { env->ReleaseStringUTFChars(gamePath, gp); return -1.0; }
 
     bool ok = true;
     ok &= loadSymbol(core.api_version, "retro_api_version");
@@ -231,7 +226,6 @@ Java_com_sfj_n64plus_EmulatorActivity_nativePrepare(JNIEnv* env, jobject thiz,
         releaseCore();
         return -1.0;
     }
-    javaVm = nullptr;
     env->GetJavaVM(&javaVm);
     javaActivity = env->NewGlobalRef(thiz);
     jclass cls = env->GetObjectClass(thiz);
@@ -250,22 +244,19 @@ Java_com_sfj_n64plus_EmulatorActivity_nativePrepare(JNIEnv* env, jobject thiz,
     core.set_input_poll(inputPollCallback);
     core.set_input_state(inputStateCallback);
     core.init();
+    coreInitialized = true;
 
     retro_game_info info{};
     info.path = gp;
     const bool loaded = core.load_game(&info);
     env->ReleaseStringUTFChars(gamePath, gp);
-    if (!loaded) {
-        releaseCore();
-        return -1.0;
-    }
+    if (!loaded) { releaseCore(); return -1.0; }
     gameLoaded = true;
+
     retro_system_av_info av{};
     core.get_system_av_info(&av);
     frameRate = av.timing.fps > 1.0 ? av.timing.fps : 60.0;
     audioRate = av.timing.sample_rate > 8000.0 ? av.timing.sample_rate : 32000.0;
-    videoWidth = av.geometry.base_width ? av.geometry.base_width : 256;
-    videoHeight = av.geometry.base_height ? av.geometry.base_height : 224;
     return audioRate;
 }
 
@@ -276,12 +267,10 @@ Java_com_sfj_n64plus_EmulatorActivity_nativeRun(JNIEnv*, jobject) {
     running.store(true);
     emulationThread = std::thread(runLoop);
 }
-
 extern "C" JNIEXPORT void JNICALL
 Java_com_sfj_n64plus_EmulatorActivity_nativeSetInput(JNIEnv*, jobject, jint mask) {
     joypadMask.store(static_cast<uint16_t>(mask));
 }
-
 extern "C" JNIEXPORT void JNICALL
 Java_com_sfj_n64plus_EmulatorActivity_nativeStop(JNIEnv*, jobject) {
     std::lock_guard<std::mutex> guard(coreMutex);
