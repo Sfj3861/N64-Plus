@@ -51,6 +51,7 @@ class EmulatorActivity : Activity() {
         io.execute {
             try {
                 val staged = stageContent(uri, extension)
+                if (closing || isFinishing) return@execute
                 val core = File(filesDir, "cores/libretro_snes.so")
                 val result = if (core.isFile) {
                     nativeProbeCore(core.absolutePath)
