@@ -156,20 +156,46 @@ class EmulatorActivity : Activity(), SurfaceHolder.Callback {
         isAllCaps = false
         setTextColor(Color.WHITE)
         backgroundTintList = android.content.res.ColorStateList.valueOf(Color.rgb(48, 62, 91))
-        setOnTouchListener { _, event ->
+        // Each control owns its touch stream. Do not treat POINTER_UP from another
+        // finger as this button's release; Android delivers DOWN/UP per touch target.
+        var held = false
+        setOnTouchListener { view, event ->
             when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> setInput(id, true)
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_POINTER_UP -> setInput(id, false)
+                MotionEvent.ACTION_DOWN -> {
+                    held = true
+                    setInput(id, true)
+                    view.isPressed = true
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (held) setInput(id, false)
+                    held = false
+                    view.isPressed = false
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    if (held) setInput(id, false)
+                    held = false
+                    view.isPressed = false
+                    true
+                }
+                else -> true
             }
-            true
         }
     }
 
     private fun setInput(id: Int, pressed: Boolean) {
         val bit = 1 shl id
-        val next = if (pressed) inputMask.get() or bit else inputMask.get() and bit.inv()
+        val previous = inputMask.get()
+        val next = if (pressed) previous or bit else previous and bit.inv()
+        if (next == previous) return
         inputMask.set(next)
         if (started) nativeSetInput(next)
+    }
+
+    private fun releaseAllInputs() {
+        inputMask.set(0)
+        if (started) nativeSetInput(0)
     }
 
     private fun startIfReady() {
@@ -224,6 +250,7 @@ class EmulatorActivity : Activity(), SurfaceHolder.Callback {
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         surfaceReady = false
+        releaseAllInputs()
         stopRuntime()
     }
 
@@ -267,6 +294,7 @@ class EmulatorActivity : Activity(), SurfaceHolder.Callback {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     override fun onPause() {
+        releaseAllInputs()
         stopRuntime()
         super.onPause()
     }
@@ -281,6 +309,7 @@ class EmulatorActivity : Activity(), SurfaceHolder.Callback {
 
     override fun onDestroy() {
         closing = true
+        releaseAllInputs()
         started = false
         io.execute {
             nativeStop()
