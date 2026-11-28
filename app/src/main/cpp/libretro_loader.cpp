@@ -19,7 +19,9 @@ enum {
     RETRO_ENVIRONMENT_SET_PIXEL_FORMAT = 10,
     RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME = 18,
     RETRO_ENVIRONMENT_SET_GEOMETRY = 37,
+    RETRO_PIXEL_FORMAT_0RGB1555 = 0,
     RETRO_PIXEL_FORMAT_XRGB8888 = 1,
+    RETRO_PIXEL_FORMAT_RGB565 = 2,
     RETRO_DEVICE_JOYPAD = 1
 };
 
@@ -65,30 +67,46 @@ static double frameRate = 60.0, audioRate = 32000.0;
 static bool coreInitialized = false;
 static bool gameLoaded = false;
 static unsigned configuredWidth = 0, configuredHeight = 0;
+static unsigned pixelFormat = RETRO_PIXEL_FORMAT_XRGB8888;
 
 static bool environmentCallback(unsigned command, void* data) {
     switch (command) {
         case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:
             if (!data) return false;
-            *static_cast<unsigned*>(data) = RETRO_PIXEL_FORMAT_XRGB8888;
-            return true;
+            // Libretro passes the requested format. Accept only the format this
+            // frontend's conversion routine actually handles.
+            pixelFormat = *static_cast<unsigned*>(data);
+            return pixelFormat == RETRO_PIXEL_FORMAT_XRGB8888;
         case RETRO_ENVIRONMENT_GET_CAN_DUPE:
             if (data) *static_cast<bool*>(data) = true;
-            return true;
-        case RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME:
-            return true;
-        case RETRO_ENVIRONMENT_SET_GEOMETRY:
             return data != nullptr;
+        case RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME:
+            if (data) *static_cast<bool*>(data) = false;
+            return data != nullptr;
+        case RETRO_ENVIRONMENT_SET_GEOMETRY:
+            if (!data || !windowHandle) return false;
+            {
+                const auto* geometry = static_cast<const retro_game_geometry*>(data);
+                if (geometry->base_width && geometry->base_height) {
+                    ANativeWindow_setBuffersGeometry(windowHandle,
+                        static_cast<int32_t>(geometry->base_width),
+                        static_cast<int32_t>(geometry->base_height), WINDOW_FORMAT_RGBA_8888);
+                    configuredWidth = geometry->base_width;
+                    configuredHeight = geometry->base_height;
+                }
+            }
+            return true;
         default:
             return false;
     }
 }
 
 static void videoCallback(const void* data, unsigned width, unsigned height, size_t pitch) {
-    if (!data || !windowHandle || width == 0 || height == 0) return;
+    if (!data || !windowHandle || width == 0 || height == 0 ||
+        pixelFormat != RETRO_PIXEL_FORMAT_XRGB8888) return;
     if (width != configuredWidth || height != configuredHeight) {
-        ANativeWindow_setBuffersGeometry(windowHandle, static_cast<int32_t>(width),
-                                         static_cast<int32_t>(height), WINDOW_FORMAT_RGBA_8888);
+        if (ANativeWindow_setBuffersGeometry(windowHandle, static_cast<int32_t>(width),
+                static_cast<int32_t>(height), WINDOW_FORMAT_RGBA_8888) != 0) return;
         configuredWidth = width;
         configuredHeight = height;
     }
@@ -102,6 +120,7 @@ static void videoCallback(const void* data, unsigned width, unsigned height, siz
         const auto* row = reinterpret_cast<const uint32_t*>(src + y * pitch);
         auto* out = dst + y * buffer.stride;
         for (unsigned x = 0; x < copyW; ++x) {
+            // XRGB8888 core pixels are 0x00RRGGBB. Write RGBA byte order.
             const uint32_t px = row[x];
             const uint32_t r = (px >> 16) & 0xff;
             const uint32_t g = (px >> 8) & 0xff;
@@ -118,20 +137,27 @@ static size_t audioBatchCallback(const int16_t* samples, size_t frames) {
     bool attached = false;
     const jint state = javaVm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
     if (state == JNI_EDETACHED) {
-        if (javaVm->AttachCurrentThread(&env, nullptr) != JNI_OK) return frames;
+        if (javaVm->AttachCurrentThread(&env, nullptr) != JNI_OK) return 0;
         attached = true;
-    } else if (state != JNI_OK) return frames;
+    } else if (state != JNI_OK) return 0;
 
-    const jsize count = static_cast<jsize>(std::min<size_t>(frames * 2, 32768));
+    // Avoid oversized JNI arrays, but never claim frames were consumed if
+    // the callback failed to pass them to the audio sink.
+    const size_t boundedFrames = std::min<size_t>(frames, 16384);
+    const jsize count = static_cast<jsize>(boundedFrames * 2);
     jshortArray array = env->NewShortArray(count);
+    size_t consumed = 0;
     if (array) {
         env->SetShortArrayRegion(array, 0, count, reinterpret_cast<const jshort*>(samples));
-        env->CallVoidMethod(javaActivity, audioMethod, array, count);
-        env->DeleteLocalRef(array);
+        if (!env->ExceptionCheck()) {
+            env->CallVoidMethod(javaActivity, audioMethod, array, count);
+            if (!env->ExceptionCheck()) consumed = boundedFrames;
+        }
         if (env->ExceptionCheck()) env->ExceptionClear();
+        env->DeleteLocalRef(array);
     }
     if (attached) javaVm->DetachCurrentThread();
-    return frames;
+    return consumed;
 }
 
 static void audioSampleCallback(int16_t left, int16_t right) {
@@ -167,6 +193,7 @@ static void releaseCore() {
     }
     audioMethod = nullptr;
     configuredWidth = configuredHeight = 0;
+    pixelFormat = RETRO_PIXEL_FORMAT_XRGB8888;
     joypadMask.store(0);
 }
 
@@ -184,7 +211,7 @@ static void runLoop() {
 }
 
 extern "C" JNIEXPORT jdouble JNICALL
-Java_com_sfj_n64plus_EmulatorActivity_nativePrepare(JNIEnv* env, jobject thiz,
+Java_com_sfj3861_n64plus_EmulatorActivity_nativePrepare(JNIEnv* env, jobject thiz,
         jstring corePath, jstring gamePath, jobject surface) {
     std::lock_guard<std::mutex> guard(coreMutex);
     releaseCore();
@@ -261,18 +288,18 @@ Java_com_sfj_n64plus_EmulatorActivity_nativePrepare(JNIEnv* env, jobject thiz,
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sfj_n64plus_EmulatorActivity_nativeRun(JNIEnv*, jobject) {
+Java_com_sfj3861_n64plus_EmulatorActivity_nativeRun(JNIEnv*, jobject) {
     std::lock_guard<std::mutex> guard(coreMutex);
     if (!core.run || running.load()) return;
     running.store(true);
     emulationThread = std::thread(runLoop);
 }
 extern "C" JNIEXPORT void JNICALL
-Java_com_sfj_n64plus_EmulatorActivity_nativeSetInput(JNIEnv*, jobject, jint mask) {
+Java_com_sfj3861_n64plus_EmulatorActivity_nativeSetInput(JNIEnv*, jobject, jint mask) {
     joypadMask.store(static_cast<uint16_t>(mask));
 }
 extern "C" JNIEXPORT void JNICALL
-Java_com_sfj_n64plus_EmulatorActivity_nativeStop(JNIEnv*, jobject) {
+Java_com_sfj3861_n64plus_EmulatorActivity_nativeStop(JNIEnv*, jobject) {
     std::lock_guard<std::mutex> guard(coreMutex);
     releaseCore();
 }
