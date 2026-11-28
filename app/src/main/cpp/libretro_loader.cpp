@@ -103,7 +103,7 @@ static bool environmentCallback(unsigned command, void* data) {
 
 static void videoCallback(const void* data, unsigned width, unsigned height, size_t pitch) {
     if (!data || !windowHandle || width == 0 || height == 0 ||
-        pixelFormat != RETRO_PIXEL_FORMAT_XRGB8888) return;
+        pixelFormat > RETRO_PIXEL_FORMAT_RGB565) return;
     if (width != configuredWidth || height != configuredHeight) {
         if (ANativeWindow_setBuffersGeometry(windowHandle, static_cast<int32_t>(width),
                 static_cast<int32_t>(height), WINDOW_FORMAT_RGBA_8888) != 0) return;
@@ -120,11 +120,23 @@ static void videoCallback(const void* data, unsigned width, unsigned height, siz
         const auto* row = reinterpret_cast<const uint32_t*>(src + y * pitch);
         auto* out = dst + y * buffer.stride;
         for (unsigned x = 0; x < copyW; ++x) {
-            // XRGB8888 core pixels are 0x00RRGGBB. Write RGBA byte order.
-            const uint32_t px = row[x];
-            const uint32_t r = (px >> 16) & 0xff;
-            const uint32_t g = (px >> 8) & 0xff;
-            const uint32_t b = px & 0xff;
+            uint32_t r, g, b;
+            if (pixelFormat == RETRO_PIXEL_FORMAT_XRGB8888) {
+                // Libretro XRGB8888: 0x00RRGGBB.
+                const uint32_t px = row[x];
+                r = (px >> 16) & 0xff; g = (px >> 8) & 0xff; b = px & 0xff;
+            } else {
+                // Libretro 16-bit formats use native-endian packed pixels.
+                const uint16_t px = reinterpret_cast<const uint16_t*>(src + y * pitch)[x];
+                r = ((px >> 11) & 0x1f) * 255 / 31;
+                g = ((px >> 5) & 0x3f) * 255 / 63;
+                b = (px & 0x1f) * 255 / 31;
+                if (pixelFormat == RETRO_PIXEL_FORMAT_0RGB1555) {
+                    r = ((px >> 10) & 0x1f) * 255 / 31;
+                    g = ((px >> 5) & 0x1f) * 255 / 31;
+                    b = (px & 0x1f) * 255 / 31;
+                }
+            }
             out[x] = r | (g << 8) | (b << 16) | 0xff000000u;
         }
     }
