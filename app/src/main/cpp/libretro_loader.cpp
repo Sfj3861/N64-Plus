@@ -211,7 +211,7 @@ static void runLoop() {
 }
 
 extern "C" JNIEXPORT jdouble JNICALL
-Java_com_sfj3861_n64plus_EmulatorActivity_nativePrepare(JNIEnv* env, jobject thiz,
+Java_com_sfj_n64plus_EmulatorActivity_nativePrepare(JNIEnv* env, jobject thiz,
         jstring corePath, jstring gamePath, jobject surface) {
     std::lock_guard<std::mutex> guard(coreMutex);
     releaseCore();
@@ -288,18 +288,18 @@ Java_com_sfj3861_n64plus_EmulatorActivity_nativePrepare(JNIEnv* env, jobject thi
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_sfj3861_n64plus_EmulatorActivity_nativeRun(JNIEnv*, jobject) {
+Java_com_sfj_n64plus_EmulatorActivity_nativeRun(JNIEnv*, jobject) {
     std::lock_guard<std::mutex> guard(coreMutex);
     if (!core.run || running.load()) return;
     running.store(true);
     emulationThread = std::thread(runLoop);
 }
 extern "C" JNIEXPORT void JNICALL
-Java_com_sfj3861_n64plus_EmulatorActivity_nativeSetInput(JNIEnv*, jobject, jint mask) {
+Java_com_sfj_n64plus_EmulatorActivity_nativeSetInput(JNIEnv*, jobject, jint mask) {
     joypadMask.store(static_cast<uint16_t>(mask));
 }
 extern "C" JNIEXPORT void JNICALL
-Java_com_sfj3861_n64plus_EmulatorActivity_nativeStop(JNIEnv*, jobject) {
+Java_com_sfj_n64plus_EmulatorActivity_nativeStop(JNIEnv*, jobject) {
     std::lock_guard<std::mutex> guard(coreMutex);
     releaseCore();
 }
