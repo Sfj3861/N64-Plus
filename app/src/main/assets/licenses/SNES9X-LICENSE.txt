@@ -1,0 +1,56 @@
+Snes9x - Portable Super Nintendo Entertainment System (TM) emulator.
+
+Copyright notices:
+(c) 1996-2002 Gary Henderson and Jerremy Koot
+(c) 2002-2004 Matthew Kendora
+(c) 2002-2005 Peter Bortas
+(c) 2004-2006 Joel Yliluoma
+(c) 2001-2006 John Weidman
+(c) 2002-2011 contributors including Brad Jorsch, Nach, zones and others
+(c) 2009-2023 BearOso and OV2
+(c) 2017 qwertymodo
+(c) 2011-2017 Hans-Kristian Arntzen and Daniel De Matteis
+(c) 2016 byuu
+(c) 2004-2007 Shay Green
+(c) 1999-2001 Derek Liauw Kie Fa
+(c) 2003 Maxim Stepin
+
+The Snes9x project and its Libretro port include contributions from the
+copyright holders listed in the upstream Snes9x LICENSE file. Specific ports
+may contain works by additional authors; see the upstream source headers.
+
+Snes9x homepage: http://www.snes9x.com/
+Snes9x source code: https://github.com/snes9xgit/snes9x/
+
+Permission to use, copy, modify and/or distribute Snes9x in both binary
+and source form, for non-commercial purposes, is hereby granted without
+fee, providing that this license information and copyright notice appear
+with all copies and any derived work.
+
+This software is provided 'as-is', without any express or implied
+warranty. In no event shall the authors be held liable for any damages
+arising from the use of this software or its derivatives.
+
+Snes9x is freeware for PERSONAL USE only. Commercial users should seek
+permission of the copyright holders first. Commercial use includes, but is
+not limited to, charging money for Snes9x or software derived from Snes9x,
+including Snes9x or derivatives in commercial game bundles, and/or using
+Snes9x as a promotion for a commercial product.
+
+The copyright holders request that bug fixes and improvements to the code
+should be forwarded to them so everyone can benefit from future versions.
+
+Super NES and Super Nintendo Entertainment System are trademarks of
+Nintendo Co., Limited and its subsidiary companies.
+
+Some parts included in Snes9x are usually available under a different
+license, their authors having granted exceptions for their use in Snes9x
+and/or licensed them separately:
+- JMA: GPL/LGPL, see jma/license.txt
+- snes_ntsc: LGPL, see filter/snes_ntsc-license.txt
+- xBRZ: GPLv3, see filter/xbrz-license.txt
+
+This notice is included for the Snes9x core binary downloaded from the
+official Libretro Android buildbot. See the upstream LICENSE for the full
+copyright holder list and complete notices:
+https://github.com/snes9xgit/snes9x/blob/master/LICENSE

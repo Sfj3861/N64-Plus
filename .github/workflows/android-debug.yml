@@ -1,7 +1,7 @@
 name: Android debug APK
 on:
   push:
-    branches: [feature/snes-libretro-runtime-scaffold]
+    branches: [feature/n64p1-ui-snes-playback]
   pull_request:
     branches: [integration/friendly-ui, feature/snes-library-detection]
   workflow_dispatch:
@@ -28,9 +28,9 @@ jobs:
       - name: Build debug APK
         run: bash Wii-GC/Source/Android/gradlew --no-daemon assembleDebug
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk N64_P.0.debug.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk N64_P.1.debug.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: N64_P.0.debug.apk
-          path: N64_P.0.debug.apk
+          name: N64_P.1.debug.apk
+          path: N64_P.1.debug.apk
           if-no-files-found: error

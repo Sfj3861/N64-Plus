@@ -11,8 +11,9 @@ android {
         applicationId = "com.sfj.n64plus"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0-runtime-scaffold"
+        versionCode = 3
+        versionName = "0.4.0-snes-playable"
+        ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild { cmake { cppFlags += "-std=c++17" } }
     }
     externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }
