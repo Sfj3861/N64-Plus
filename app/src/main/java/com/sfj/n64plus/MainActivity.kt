@@ -13,6 +13,10 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import android.os.Build
+import java.net.HttpURLConnection
+import java.net.URL
+import org.json.JSONObject
 
 class MainActivity : Activity() {
     private val consoles = listOf("Nintendo 64", "Super Nintendo", "Wii", "GameCube")
@@ -42,7 +46,7 @@ class MainActivity : Activity() {
         content.addView(panelCard().apply { folderDisplay = label("Folder not selected", 14, muted); addView(folderDisplay); addView(button("＋  Select library folder", accent) { browseFolder() }); addView(button("↻  Refresh library", Color.rgb(49, 64, 91)) { scanFolder() }) })
         content.addView(space(8)); games = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; content.addView(games)
         content.addView(space(8)); content.addView(button("▶  Play selected game", Color.rgb(43, 160, 117)) { launchSelected() })
-        content.addView(space(16)); content.addView(panelCard().apply { addView(label("STATUS", 12, accent, true)); status = label("Select Super Nintendo and add your game folder.", 14, muted); addView(status) })
+        content.addView(space(16)); content.addView(panelCard().apply { addView(label("UPDATES", 12, accent, true)); addView(label("Check whether a newer N64_P build is available.", 14, muted)); addView(button("Check for updates", accent) { checkUpdates() }) }); content.addView(space(16)); content.addView(panelCard().apply { addView(label("STATUS", 12, accent, true)); status = label("Select Super Nintendo and add your game folder.", 14, muted); addView(status) })
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f)); setContentView(root); refreshFolder()
     }
     private fun refreshSystems() {
@@ -89,6 +93,36 @@ class MainActivity : Activity() {
             putExtra(EmulatorActivity.EXTRA_GAME_TITLE, game.title)
             putExtra(EmulatorActivity.EXTRA_GAME_EXTENSION, game.extension)
         })
+    }
+    private fun checkUpdates() {
+        Toast.makeText(this, "Checking GitHub Releases…", Toast.LENGTH_SHORT).show()
+        Thread {
+            try {
+                val connection = (URL("https://api.github.com/repos/Sfj3861/N64-Plus/releases/latest").openConnection() as HttpURLConnection)
+                connection.connectTimeout = 8000; connection.readTimeout = 8000
+                connection.setRequestProperty("Accept", "application/vnd.github+json")
+                connection.setRequestProperty("User-Agent", "N64-Plus-Android")
+                val code = connection.responseCode
+                if (code != 200) throw java.io.IOException("No published release found (HTTP $code).")
+                val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+                val tag = json.optString("tag_name")
+                val url = json.optString("html_url")
+                val current = packageManager.getPackageInfo(packageName, 0).versionName ?: ""
+                runOnUiThread {
+                    if (tag.isBlank()) Toast.makeText(this, "Release version unavailable.", Toast.LENGTH_LONG).show()
+                    else if (tag.equals(current, true) || tag.removePrefix("v").equals(current.removePrefix("v"), true))
+                        Toast.makeText(this, "You're up to date ($current).", Toast.LENGTH_LONG).show()
+                    else android.app.AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Update available")
+                        .setMessage("Installed: $current\\nLatest: $tag\\n\\nOpen the release page to download and install manually?")
+                        .setPositiveButton("Open release") { _, _ -> startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                        .setNegativeButton("Later", null).show()
+                }
+                connection.disconnect()
+            } catch (e: Exception) {
+                runOnUiThread { Toast.makeText(this, "Update check failed: ${e.message ?: "network error"}", Toast.LENGTH_LONG).show() }
+            }
+        }.start()
     }
     private fun panelCard() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(12), dp(14), dp(12)); setBackgroundColor(panel); val lp = LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, dp(5), 0, dp(5)); layoutParams = lp }
     private fun label(text: String, size: Int, color: Int, bold: Boolean = false) = TextView(this).apply { this.text = text; textSize = size.toFloat(); setTextColor(color); if (bold) typeface = Typeface.DEFAULT_BOLD; setPadding(dp(3), dp(5), dp(3), dp(5)) }
